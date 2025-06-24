@@ -1,11 +1,5 @@
 # ui.py  ────────────────────────────────────────────────────────────────
 # Streamlit app: Natural-language prompt ➜ OpenSCAD code ➜ PNG preview
-#
-# Key security:
-#   • First tries st.secrets["OPENAI_API_KEY"]      (Streamlit Cloud)
-#   • Falls back to env var  OPENAI_API_KEY         (local runs / CI)
-#   • Abort with an error if neither is set.
-#
 # ----------------------------------------------------------------------
 import os, uuid, tempfile
 from pathlib import Path
@@ -14,28 +8,19 @@ import streamlit as st
 from PIL import Image
 from langchain_openai import ChatOpenAI
 
-from txt_to_code import text_to_scad, save_scad_code, render_scad  # your helper module
+from txt_to_code import text_to_scad, save_scad_code, render_scad
 
-# ── CONFIG (safe to keep in repo) ─────────────────────────────────────
-OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"   # adjust for Linux/Mac
-MODEL_NAME   = "gpt-4o-mini"
+# ── HARD-CODE YOUR OPENAI SECRET KEY HERE ─────────────────────────────
+OPENAI_API_KEY='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'
+# ← use normal sk-… key
 # ---------------------------------------------------------------------
 
-# ── Securely obtain key ──────────────────────────────────────────────
-api_key = (
-    st.secrets.get("OPENAI_API_KEY") or    # Streamlit Cloud
-    os.getenv("OPENAI_API_KEY")            # local / GitHub Actions / .env
-)
-if not api_key:
-    st.error(
-        "OPENAI_API_KEY not found.\n"
-        "• Add it in Streamlit Cloud:  Settings → Secrets  (preferred)\n"
-        "• Or set an environment variable locally:  export OPENAI_API_KEY='sk-…'"
-    )
-    st.stop()
+# Other constants
+OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"    # adjust for Linux/Mac
+MODEL_NAME   = "gpt-4o-mini"
 
-# Expose the key so LangChain/OpenAI SDK can read it automatically
-os.environ["OPENAI_API_KEY"] = api_key
+# Expose the key so any downstream libs (optional) can see it
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
 # ── Sidebar controls ─────────────────────────────────────────────────
 st.sidebar.title("Generation settings")
@@ -57,8 +42,11 @@ if st.button("Generate"):
 
     # 1 ─ LLM call -----------------------------------------------------
     st.info("Generating OpenSCAD code…")
-    llm_model = ChatOpenAI(model=MODEL_NAME, temperature=temperature,openai_api_key='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'
-)
+    llm_model = ChatOpenAI(
+        model=MODEL_NAME,
+        temperature=temperature,
+        openai_api_key=OPENAI_API_KEY     # ← explicit key
+    )
     try:
         scad_code = text_to_scad(llm_model, prompt)
     except Exception as e:
