@@ -9,17 +9,11 @@ from PIL import Image
 from txt_to_code import text_to_scad, save_scad_code, render_scad
 
 # ---------- CONFIG ----------------------------------------------------
-OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"  # adjust as needed
-GOOGLE_API_KEY = "AIzaSyAQaB-TUhSL_GRDOgln0yYPobheeaXCd9k"   # 🔒 do not share publicly
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
-
-# ---------- Sidebar ---------------------------------------------------
-st.sidebar.title("Generation settings")
-base_temp = st.sidebar.slider("Base temperature", 0.0, 1.0, 0.0, 0.05)
-st.sidebar.markdown("Model: **gemini-1.5-flash** (auto-retries ramp temp)")
+OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"   # adjust for your OS
+os.environ["GOOGLE_API_KEY"] = "AIzaSyAQaB-TUhSL_GRDOgln0yYPobheeaXCd9k"  # ⚠️
 
 # ---------- Main panel ------------------------------------------------
-st.title("🖼️  Text → OpenSCAD → PNG (Gemini)")
+st.title("🖼️  Text → OpenSCAD → PNG  (Gemini)")
 
 prompt = st.text_area(
     "Describe your CAD part",
@@ -35,13 +29,13 @@ if st.button("Generate"):
     # 1 ─ Generate SCAD -----------------------------------------------
     st.info("Generating OpenSCAD code with Gemini …")
     try:
-        scad_code = text_to_scad(prompt, base_temperature=base_temp)
+        scad_code = text_to_scad(prompt)        # default base_temperature = 0.0
     except Exception as e:
         st.error(f"LLM generation failed:\n{e}")
         st.stop()
 
     # 2 ─ Save .scad ---------------------------------------------------
-    tmp_dir = Path(tempfile.gettempdir()) / f"cad_{uuid.uuid4().hex[:8]}"
+    tmp_dir   = Path(tempfile.gettempdir()) / f"cad_{uuid.uuid4().hex[:8]}"
     tmp_dir.mkdir(exist_ok=True)
     scad_path = save_scad_code(scad_code, tmp_dir / "model")
 
@@ -50,7 +44,7 @@ if st.button("Generate"):
     try:
         png_path = render_scad(scad_path, openscad_path=OPENSCAD_EXE)
     except FileNotFoundError:
-        st.error("OpenSCAD CLI not found. Check `OPENSCAD_EXE` in ui.py.")
+        st.error("OpenSCAD CLI not found. Check OPENSCAD_EXE in ui.py.")
         st.stop()
     except Exception as e:
         st.error(f"Render failed:\n{e}")
@@ -70,4 +64,4 @@ if st.button("Generate"):
                        png_path.read_bytes(),
                        file_name="preview.png")
 
-    st.success("Done ✔︎ Share the files or link with anyone.")
+    st.success("Done ✔︎  Share the files or link with anyone.")
