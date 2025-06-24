@@ -1,0 +1,10 @@
+# Core packages
+streamlit>=1.35
+pillow
+
+# LangChain & OpenAI LLM support
+langchain
+langchain-openai
+
+# If you're using dotenv locally (optional)
+# python-dotenv
