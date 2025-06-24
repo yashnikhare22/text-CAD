@@ -10,7 +10,7 @@ from txt_to_code import text_to_scad, save_scad_code, render_scad
 
 # ---------- CONFIG ----------------------------------------------------
 OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"  # adjust as needed
-GOOGLE_API_KEY = "AIzaSyCU7SL8v8PddBNKIs3Yhoua35uzjgt7gRE"   # 🔒 do not share publicly
+GOOGLE_API_KEY = "AIzaSyAQaB-TUhSL_GRDOgln0yYPobheeaXCd9k"   # 🔒 do not share publicly
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 # ---------- Sidebar ---------------------------------------------------
