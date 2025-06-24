@@ -1,48 +1,30 @@
-# ui.py  ────────────────────────────────────────────────────────────────
-# Streamlit app: Natural-language prompt ➜ OpenSCAD code ➜ PNG preview
-#
-# Key security:
-#   • First tries st.secrets["OPENAI_API_KEY"]      (Streamlit Cloud)
-#   • Falls back to env var  OPENAI_API_KEY         (local runs / CI)
-#   • Abort with an error if neither is set.
-#
-# ----------------------------------------------------------------------
+# ui.py
+# ---------------------------------------------------------------------
+# Streamlit app: natural-language prompt → OpenSCAD code → PNG preview
+# ---------------------------------------------------------------------
 import os, uuid, tempfile
 from pathlib import Path
 
 import streamlit as st
 from PIL import Image
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-from txt_to_code import text_to_scad, save_scad_code, render_scad  # your helper module
+from txt_to_code import text_to_scad, save_scad_code, render_scad
 
-# ── CONFIG (safe to keep in repo) ─────────────────────────────────────
-OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"   # adjust for Linux/Mac
-MODEL_NAME   = "gpt-4o-mini"
-# ---------------------------------------------------------------------
+# ---------- CONSTANTS -------------------------------------------------
+OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"  # adjust for Linux/Mac
+MODEL_NAME   = "gemini-pro"                               # or gemini-1.5-pro, etc.
 
-# ── Securely obtain key ──────────────────────────────────────────────
-api_key = (
-    st.secrets.get("OPENAI_API_KEY") or    # Streamlit Cloud
-    os.getenv("OPENAI_API_KEY")            # local / GitHub Actions / .env
-)
-if not api_key:
-    st.error(
-        "OPENAI_API_KEY not found.\n"
-        "• Add it in Streamlit Cloud:  Settings → Secrets  (preferred)\n"
-        "• Or set an environment variable locally:  export OPENAI_API_KEY='sk-…'"
-    )
-    st.stop()
+# ---------- HARD-CODED GEMINI KEY  (❗ replace with your real key) -----
+GOOGLE_API_KEY = "AIzaSyCU7SL8v8PddBNKIs3Yhoua35uzjgt7gRE"
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
-# Expose the key so LangChain/OpenAI SDK can read it automatically
-os.environ["OPENAI_API_KEY"] = api_key
-
-# ── Sidebar controls ─────────────────────────────────────────────────
+# ---------- Sidebar controls -----------------------------------------
 st.sidebar.title("Generation settings")
 temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.0, 0.05)
 
-# ── UI main pane ─────────────────────────────────────────────────────
-st.title("🖼️  Text → OpenSCAD → PNG")
+# ---------- Main UI ---------------------------------------------------
+st.title("🖼️  Text → OpenSCAD → PNG (Gemini edition)")
 
 prompt = st.text_area(
     "Describe your CAD part",
@@ -56,8 +38,8 @@ if st.button("Generate"):
         st.stop()
 
     # 1 ─ LLM call -----------------------------------------------------
-    st.info("Generating OpenSCAD code…")
-    llm_model = ChatOpenAI(model=MODEL_NAME, temperature=temperature)
+    st.info("Generating OpenSCAD code with Gemini…")
+    llm_model = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=temperature)
     try:
         scad_code = text_to_scad(llm_model, prompt)
     except Exception as e:
@@ -74,13 +56,13 @@ if st.button("Generate"):
     try:
         png_path = render_scad(scad_path, openscad_path=OPENSCAD_EXE)
     except FileNotFoundError:
-        st.error("OpenSCAD CLI not found.  Check OPENSCAD_EXE path in ui.py.")
+        st.error("OpenSCAD CLI not found. Check OPENSCAD_EXE path in ui.py.")
         st.stop()
     except Exception as e:
         st.error(f"Render failed:\n{e}")
         st.stop()
 
-    # 4 ─ Show results & downloads ------------------------------------
+    # 4 ─ Show + download ---------------------------------------------
     st.subheader("OpenSCAD source")
     st.code(scad_code, language="scad")
 
