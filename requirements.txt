@@ -1,10 +1,8 @@
-# Core packages
+# Core UI
 streamlit>=1.35
-pillow
+pillow            # PIL image handling
 
-# LangChain & OpenAI LLM support
-langchain
-langchain-openai
-
-# If you're using dotenv locally (optional)
-# python-dotenv
+# LangChain + Gemini
+langchain>=0.2.0
+langchain-google-genai>=0.1.8
+google-generativeai>=0.4.1
