@@ -57,7 +57,8 @@ if st.button("Generate"):
 
     # 1 ─ LLM call -----------------------------------------------------
     st.info("Generating OpenSCAD code…")
-    llm_model = ChatOpenAI(model=MODEL_NAME, temperature=temperature)
+    llm_model = ChatOpenAI(model=MODEL_NAME, temperature=temperature,openai_api_key='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'
+)
     try:
         scad_code = text_to_scad(llm_model, prompt)
     except Exception as e:
