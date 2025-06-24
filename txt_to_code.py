@@ -11,7 +11,7 @@ from prompt import main_prompt, generic_prompt
 from scad import SCADGuard
 
 # Ensure key is in env (ui.py already sets it)
-assert "GOOGLE_API_KEY" in os.environ, "GOOGLE_API_KEY not set!"
+os.environ["GOOGLE_API_KEY"] = "AIzaSyCU7SL8v8PddBNKIs3Yhoua35uzjgt7gRE"
 
 def text_to_scad(
     request: str,
