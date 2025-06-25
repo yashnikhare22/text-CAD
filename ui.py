@@ -34,7 +34,7 @@ OPENSCAD_EXE = (
 log.debug("🔍 OPENSCAD_EXE = %s", OPENSCAD_EXE)
 
 # ── UI layout ─────────────────────────────────────────────────────────
-st.title("🖼️  Text → OpenSCAD → Phase 0")
+st.title("🖼️  Text → CAD → Phase 0")
 
 prompt = st.text_area(
     "Describe your CAD part",
