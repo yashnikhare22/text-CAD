@@ -1,10 +1,7 @@
-# Core UI
+
+
 streamlit>=1.35
-pillow            # PIL image handling
-
-# LangChain + 
-langchain>=0.2.0
-google-generativeai>=0.4.1
-langchain-google-genai==0.1.9
-google-generativeai>=0.4.1
-
+pillow
+langchain>=0.3          # or whatever floor you need
+langchain-google-genai>=1.0
+google-generativeai>=0.8
