@@ -76,7 +76,6 @@ if st.button("Generate"):
     # 4 ─ Display & download -------------------------------------------
     st.subheader("OpenSCAD source")
     st.code(scad_code, language="scad")
-
     st.subheader("Preview")
     st.image(Image.open(png_path), use_container_width=True)
 
