@@ -5,6 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 from PIL import Image
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]  # <- before next import!
 
 from txt_to_code import text_to_scad, save_scad_code, render_scad
 
