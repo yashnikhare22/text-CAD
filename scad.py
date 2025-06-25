@@ -1,9 +1,10 @@
 # scad.py ───────────────────────────────────────────────────────────────
 """
-Static hygiene + optional compile check for OpenSCAD code.
+Static hygiene + compile check for OpenSCAD code.
 
-• Uses xvfb-run automatically in head-less Linux containers
-• Emits rich DEBUG-level logs so you can see exactly what happens
+• Works with ALL known OpenSCAD versions (2019.05 → 2025.02.x)
+• Falls back automatically if the legacy '--check' flag is gone
+• Rich DEBUG logging for Streamlit Cloud
 """
 
 from __future__ import annotations
@@ -20,23 +21,18 @@ from typing import Tuple
 
 from config import OPENSCAD_PATH
 
-# ── Logging setup (inherits root level from ui.py) ─────────────────────
 log = logging.getLogger(__name__)
 
-# ── Head-less helper ───────────────────────────────────────────────────
-XVFB_RUN = shutil.which("xvfb-run") if platform.system() != "Windows" else None
+# ── xvfb wrapper for head-less Linux containers ────────────────────────
+XVFB = shutil.which("xvfb-run") if platform.system() != "Windows" else None
 
 
 def _wrap(cmd: list[str]) -> list[str]:
-    """Prefix *cmd* with xvfb-run if available (Linux head-less)."""
-    if XVFB_RUN:
-        return [
-            XVFB_RUN,
-            "--auto-servernum",
-            "--server-args=-screen 0 1280x1024x24",
-            *cmd,
-        ]
-    return cmd
+    return (
+        [XVFB, "--auto-servernum", "--server-args=-screen 0 1280x1024x24", *cmd]
+        if XVFB
+        else cmd
+    )
 
 
 # ── Regexes & built-ins (unchanged) ────────────────────────────────────
@@ -60,12 +56,10 @@ _STD = {
 
 @dataclass
 class SCADGuard:
-    """Sanity-check and (optionally) compile OpenSCAD snippets."""
-
     openscad_path: str = field(default_factory=lambda: OPENSCAD_PATH)
     max_lines: int = 15
 
-    # ── Static hygiene check ───────────────────────────────────────────
+    # ───────────────────────────────────────────────────────────────────
     def clean(self, code: str) -> Tuple[bool, str]:
         if FENCE_RE.search(code):
             return False, "markdown fence present"
@@ -78,7 +72,7 @@ class SCADGuard:
             return False, f"undefined helpers: {', '.join(sorted(undef))}"
         return True, ""
 
-    # ── Optional compile check (xvfb-aware & verbose) ─────────────────
+    # ── robust compile check (multi-strategy) ──────────────────────────
     def compile_ok(self, code: str) -> Tuple[bool, str]:
         if not self.openscad_path:
             return True, "(OpenSCAD CLI not installed – skipped)"
@@ -88,14 +82,41 @@ class SCADGuard:
             path = tmp.name
 
         try:
-            cmd = _wrap([self.openscad_path, "--check", path])
-            log.debug("🔧 [SCADGuard] running: %s", " ".join(cmd))
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            log.debug("🔧 [SCADGuard] return-code: %s", res.returncode)
-            log.debug("🔧 [SCADGuard] stdout ▶\n%s", res.stdout)
-            log.debug("🔧 [SCADGuard] stderr ▶\n%s", res.stderr)
+            # 1️⃣ original flag (2019/2021 builds)
+            ok, err = self._run(["--check", path])
+            if ok or not self._ambiguous(err):
+                return ok, err  # success OR real failure on old versions
 
-            err = "\n".join(res.stderr.strip().splitlines()[: self.max_lines])
-            return res.returncode == 0, err
+            # 2️⃣ new flags (2025+ builds)
+            ok, err = self._run(
+                ["--check-parameters=true", "--check-parameter-ranges=true", path]
+            )
+            if ok or not self._unknown_option(err):
+                return ok, err  # success OR something other than 'unknown option'
+
+            # 3️⃣ last resort: syntax-only (-o - term) works on every build
+            ok, err = self._run(["-o", "-", "--preview", path])
+            return ok, err
         finally:
             Path(path).unlink(missing_ok=True)
+
+    # ── helpers ────────────────────────────────────────────────────────
+    def _run(self, extra_args: list[str]) -> Tuple[bool, str]:
+        cmd = _wrap([self.openscad_path, *extra_args])
+        log.debug("🔧 compile-check: %s", " ".join(cmd))
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+        log.debug("🔧 return-code %s", res.returncode)
+        if res.stdout:
+            log.debug("🔧 stdout ▶\n%s", res.stdout)
+        if res.stderr:
+            log.debug("🔧 stderr ▶\n%s", res.stderr)
+        err_msg = "\n".join(res.stderr.strip().splitlines()[: self.max_lines])
+        return res.returncode == 0, err_msg
+
+    @staticmethod
+    def _ambiguous(msg: str) -> bool:
+        return "ambiguous" in msg and "--check" in msg
+
+    @staticmethod
+    def _unknown_option(msg: str) -> bool:
+        return "unrecognised option" in msg or "unrecognized option" in msg
