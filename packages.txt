@@ -1,4 +1,4 @@
 openscad           # the CLI
 xvfb               # virtual X-server
 mesa-utils         # off-screen OpenGL (libGL, glxinfo, etc.)
-libglu1-mesa       # GLU dependency
+libglu1-mesa       # GLU 
