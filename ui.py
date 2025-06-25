@@ -34,7 +34,7 @@ OPENSCAD_EXE = (
 log.debug("🔍 OPENSCAD_EXE = %s", OPENSCAD_EXE)
 
 # ── UI layout ─────────────────────────────────────────────────────────
-st.title("🖼️  Text → OpenSCAD → PNG  (Gemini)")
+st.title("🖼️  Text → OpenSCAD → Phase 0")
 
 prompt = st.text_area(
     "Describe your CAD part",
@@ -48,7 +48,6 @@ if st.button("Generate"):
         st.stop()
 
     # 1 ─ Generate SCAD -------------------------------------------------
-    st.info("Generating OpenSCAD code with Gemini …")
     try:
         scad_code = text_to_scad(prompt)
     except Exception as e:
@@ -63,7 +62,6 @@ if st.button("Generate"):
     log.debug("💾 SCAD saved to %s", scad_path)
 
     # 3 ─ Render → PNG --------------------------------------------------
-    st.info("Rendering with OpenSCAD CLI …")
     try:
         png_path = render_scad(scad_path, openscad_path=OPENSCAD_EXE)
     except FileNotFoundError:
