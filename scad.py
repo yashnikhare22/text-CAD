@@ -2,18 +2,26 @@
 """
 Static hygiene + optional compile check for OpenSCAD code.
 
-NEW 2025-06-25
-• Adds xvfb support so the compile check works in head-less containers
-  (Streamlit Cloud, HuggingFace Spaces, etc.) while remaining a no-op
-  on Windows / macOS desktops.
+• Uses xvfb-run automatically in head-less Linux containers
+• Emits rich DEBUG-level logs so you can see exactly what happens
 """
+
 from __future__ import annotations
 
-import os, platform, re, shutil, subprocess, tempfile
-from pathlib import Path
+import logging
+import platform
+import re
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Tuple
-from config import OPENSCAD_PATH   # unchanged import
+
+from config import OPENSCAD_PATH
+
+# ── Logging setup (inherits root level from ui.py) ─────────────────────
+log = logging.getLogger(__name__)
 
 # ── Head-less helper ───────────────────────────────────────────────────
 XVFB_RUN = shutil.which("xvfb-run") if platform.system() != "Windows" else None
@@ -52,6 +60,8 @@ _STD = {
 
 @dataclass
 class SCADGuard:
+    """Sanity-check and (optionally) compile OpenSCAD snippets."""
+
     openscad_path: str = field(default_factory=lambda: OPENSCAD_PATH)
     max_lines: int = 15
 
@@ -68,7 +78,7 @@ class SCADGuard:
             return False, f"undefined helpers: {', '.join(sorted(undef))}"
         return True, ""
 
-    # ── Optional compile check (now xvfb-aware) ───────────────────────
+    # ── Optional compile check (xvfb-aware & verbose) ─────────────────
     def compile_ok(self, code: str) -> Tuple[bool, str]:
         if not self.openscad_path:
             return True, "(OpenSCAD CLI not installed – skipped)"
@@ -79,9 +89,12 @@ class SCADGuard:
 
         try:
             cmd = _wrap([self.openscad_path, "--check", path])
-            res = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30
-            )
+            log.debug("🔧 [SCADGuard] running: %s", " ".join(cmd))
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            log.debug("🔧 [SCADGuard] return-code: %s", res.returncode)
+            log.debug("🔧 [SCADGuard] stdout ▶\n%s", res.stdout)
+            log.debug("🔧 [SCADGuard] stderr ▶\n%s", res.stderr)
+
             err = "\n".join(res.stderr.strip().splitlines()[: self.max_lines])
             return res.returncode == 0, err
         finally:
