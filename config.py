@@ -1,7 +1,7 @@
 # config.py  ───────────────────────────────────────────────────────────
 import os, shutil
 
-GOOGLE_API_KEY = "AIzaSyDXZ1U6xV_fGfiG4RSDVPmcJzlcVmUc-Yo"
+GOOGLE_API_KEY = "AIzaSyCwhz43NGdjhXROifeblISrDxas37ZZ47A"
 
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
