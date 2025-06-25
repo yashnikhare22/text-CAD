@@ -1,8 +1,7 @@
 # config.py  ───────────────────────────────────────────────────────────
 import os, shutil
 
-# --- Gemini key (⚠️ keep private in real projects) --------------------
-GOOGLE_API_KEY = "AIzaSyCSTCvRgxbjzET4CS9e92sPkd21ooWdspQ"
+GOOGLE_API_KEY = "AIzaSyDXZ1U6xV_fGfiG4RSDVPmcJzlcVmUc-Yo"
 
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
