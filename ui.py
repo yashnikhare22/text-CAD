@@ -10,7 +10,7 @@ from txt_to_code import text_to_scad, save_scad_code, render_scad
 
 # ---------- CONFIG ----------------------------------------------------
 OPENSCAD_EXE = r"C:\Program Files\OpenSCAD\openscad.exe"   # adjust for your OS
-os.environ["GOOGLE_API_KEY"] = "AIzaSyAQaB-TUhSL_GRDOgln0yYPobheeaXCd9k"  # ⚠️
+os.environ["GOOGLE_API_KEY"] = "AIzaSyCSTCvRgxbjzET4CS9e92sPkd21ooWdspQ"  # ⚠️
 
 # ---------- Main panel ------------------------------------------------
 st.title("🖼️  Text → OpenSCAD → PNG  (Gemini)")

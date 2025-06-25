@@ -2,7 +2,7 @@
 import os, shutil
 
 # --- Gemini key (⚠️ keep private in real projects) --------------------
-GOOGLE_API_KEY = "AIzaSyAQaB-TUhSL_GRDOgln0yYPobheeaXCd9k"
+GOOGLE_API_KEY = "AIzaSyCSTCvRgxbjzET4CS9e92sPkd21ooWdspQ"
 
 os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
