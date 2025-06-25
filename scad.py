@@ -1,10 +1,14 @@
 # scad.py ───────────────────────────────────────────────────────────────
 """
-Static hygiene + compile check for OpenSCAD code.
+Static hygiene + version-agnostic compile check for OpenSCAD code.
 
-• Works with ALL known OpenSCAD versions (2019.05 → 2025.02.x)
-• Falls back automatically if the legacy '--check' flag is gone
-• Rich DEBUG logging for Streamlit Cloud
+Strategy order (fast ➜ slow):
+1. `-o - --preview`  (syntax-only, < 2 s, works 2019.05 → 2025.02)
+2. `--check-parameters=true --check-parameter-ranges=true`
+   (new 2025 builds;  raise timeout to 120 s)
+If all fail we return the *last* error to the caller.
+
+Works on head-less Linux via xvfb-run and on local Windows/Mac desktops.
 """
 
 from __future__ import annotations
@@ -23,7 +27,7 @@ from config import OPENSCAD_PATH
 
 log = logging.getLogger(__name__)
 
-# ── xvfb wrapper for head-less Linux containers ────────────────────────
+# ── xvfb wrapper for Streamlit Cloud / HF Spaces ───────────────────────
 XVFB = shutil.which("xvfb-run") if platform.system() != "Windows" else None
 
 
@@ -72,7 +76,7 @@ class SCADGuard:
             return False, f"undefined helpers: {', '.join(sorted(undef))}"
         return True, ""
 
-    # ── robust compile check (multi-strategy) ──────────────────────────
+    # ── robust compile check ───────────────────────────────────────────
     def compile_ok(self, code: str) -> Tuple[bool, str]:
         if not self.openscad_path:
             return True, "(OpenSCAD CLI not installed – skipped)"
@@ -82,41 +86,51 @@ class SCADGuard:
             path = tmp.name
 
         try:
-            # 1️⃣ original flag (2019/2021 builds)
-            ok, err = self._run(["--check", path])
-            if ok or not self._ambiguous(err):
-                return ok, err  # success OR real failure on old versions
+            # 1️⃣ ultra-fast syntax check (always available)
+            ok, err = self._run(["-o", "-", "--preview", path], timeout=25)
+            if ok:
+                return True, ""
+            # only continue if *syntax* is OK but flags unknown
+            if not self._only_preview_allowed(err):
+                return False, err
 
-            # 2️⃣ new flags (2025+ builds)
+            # 2️⃣ new 2025 flags (could be slow → 120 s timeout)
             ok, err = self._run(
-                ["--check-parameters=true", "--check-parameter-ranges=true", path]
+                ["--check-parameters=true", "--check-parameter-ranges=true", path],
+                timeout=120,
             )
-            if ok or not self._unknown_option(err):
-                return ok, err  # success OR something other than 'unknown option'
-
-            # 3️⃣ last resort: syntax-only (-o - term) works on every build
-            ok, err = self._run(["-o", "-", "--preview", path])
             return ok, err
         finally:
             Path(path).unlink(missing_ok=True)
 
     # ── helpers ────────────────────────────────────────────────────────
-    def _run(self, extra_args: list[str]) -> Tuple[bool, str]:
-        cmd = _wrap([self.openscad_path, *extra_args])
+    def _run(self, extra: list[str], timeout: int) -> Tuple[bool, str]:
+        cmd = _wrap([self.openscad_path, *extra])
         log.debug("🔧 compile-check: %s", " ".join(cmd))
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
-        log.debug("🔧 return-code %s", res.returncode)
-        if res.stdout:
-            log.debug("🔧 stdout ▶\n%s", res.stdout)
-        if res.stderr:
-            log.debug("🔧 stderr ▶\n%s", res.stderr)
-        err_msg = "\n".join(res.stderr.strip().splitlines()[: self.max_lines])
-        return res.returncode == 0, err_msg
+        try:
+            res = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout
+            )
+            err_msg = "\n".join(res.stderr.strip().splitlines()[: self.max_lines])
+            if res.stdout:
+                log.debug("🔧 stdout ▶\n%s", res.stdout)
+            if res.stderr:
+                log.debug("🔧 stderr ▶\n%s", res.stderr)
+            return res.returncode == 0, err_msg
+        except subprocess.TimeoutExpired:
+            log.debug("⏳ OpenSCAD timed out after %s s", timeout)
+            return False, f"OpenSCAD timed out after {timeout} s"
 
     @staticmethod
-    def _ambiguous(msg: str) -> bool:
-        return "ambiguous" in msg and "--check" in msg
-
-    @staticmethod
-    def _unknown_option(msg: str) -> bool:
-        return "unrecognised option" in msg or "unrecognized option" in msg
+    def _only_preview_allowed(msg: str) -> bool:
+        """
+        Detect messages that mean the flags were unknown but the file parsed.
+        If other fatal errors appear we should surface them immediately.
+        """
+        lowered = msg.lower()
+        return (
+            "unknown option" in lowered
+            or "unrecognised option" in lowered
+            or "unrecognized option" in lowered
+            or "ambiguous" in lowered
+        )
