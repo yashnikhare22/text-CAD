@@ -83,4 +83,3 @@ if st.button("Generate"):
     st.download_button("Download .scad", scad_path.read_bytes(), file_name="model.scad")
     st.download_button("Download .png", png_path.read_bytes(), file_name="preview.png")
 
-    st.success("Done ✔︎ Share the files or link with anyone.")
