@@ -1,32 +1,35 @@
-
-def main_prompt():
+# prompt.py
+def main_prompt() -> str:
     return (
-        '''You are an expert in Openscad code generator
-        Response with **Plain**, compatible and accurate OPENSCAD code with **No** Markdown fences.
-        No coments and always declare every variable and **helper function** before it is used to make accurate code syntax.
-        Expose each dimension passed ( or assumed)  as a top level variable so the model stays fuly parametric.
-        **Never use an OPENSCAD reserved keywords for varaible name**  ( module) -- Use alternate words
-        Do not hard code numeric contants inside geometry and if request is impossible, reply with single word: "ERROR" 
-        '''
+        "You are an expert in Openscad code generator\n"
+        "Respond with **plain**, compatible and accurate OPENSCAD code — "
+        "**no** Markdown fences, **no** comments.\n"
+        "Expose every dimension passed (or assumed) as a top-level variable so "
+        "the model stays fully parametric.\n"
+        "Always declare every variable *and* helper function before it is used, "
+        "and never use an OpenSCAD reserved keyword (e.g. `module`) as a "
+        "variable name.\n"
+        "If the request is impossible, reply with the single word: ERROR\n"
     )
 
 
 def generic_prompt(request: str) -> str:
     return (
-        "TASK\nCreate an OpenSCAD model that fulfils the entire user story below.\n\n"
+        "TASK\nCreate an OpenSCAD model that fulfils the entire user story below.\n"
         "RULES\n"
         "  • Output *plain* OpenSCAD code – no comments, no markdown fences.\n"
-        "  • Declare every variable and helper function before first use.\n"
-        "  • Surface **all** user-specified attributes *and* every constant or\n"
-        "    standard multiplier (e.g. `dedendum_factor = 1.25`) as named\n"
-        "    variables so *nothing* is hard-coded.\n"
+        "  • Declare **every** variable, helper function and module *before* the "
+        "first reference.  Order matters.\n"
+        "  • Surface all user-specified attributes **and** every constant or "
+        "standard multiplier (e.g. `dedendum_factor = 1.25`) as named "
+        "variables so *nothing* is hard-coded.\n"
         "  • Use only CSG primitives available in OpenSCAD ≥ 2021.01.\n"
-        "  • Use the constant `PI` (uppercase).  Do not embed degree→rad\n"
-        "    literals like 57.2958; provide your own deg2rad() helper if needed.\n"
-        "  • For **gears**: generate discrete teeth, cut the root circle, keep\n"
-        "    all cylinders centred, and expose addendum, dedendum,\n"
-        "    clearance, and `$fn` as variables.\n"
-        "    always use module_mm varaible name in entire code.\n"
-        "\nUSER STORY\n  " + request.strip() + "\n\n"
-        "DELIVERABLE\nReturn **only** the complete, compilable OpenSCAD source.\n"
+        "  • Use the constant `PI` for π.  Provide a `deg2rad()` helper if "
+        "angular conversion is needed (do **not** embed 57.2958 literals).\n"
+        "  • For **gears**: generate discrete teeth, cut the root circle, keep "
+        "all cylinders centred, and expose `addendum`, `dedendum`, "
+        "`clearance`, `module_mm`, and `$fn` as variables.\n"
+        "USER STORY\n"
+        f"  {request.strip()}\n\n"
+        "DELIVERABLE\nReturn **only** the complete, compilable OpenSCAD source."
     )

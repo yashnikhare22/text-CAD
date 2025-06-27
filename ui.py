@@ -1,84 +1,79 @@
-# ui.py ────────────────────────────────────────────────────────────────
-"""
-Streamlit front-end (Text ➜ OpenSCAD ➜ PNG) with root DEBUG logging.
-"""
-
+# txt_to_code.py — Gemini ⇨ OpenSCAD
 from __future__ import annotations
-
-import logging
-import os
-import shutil
-import tempfile
-import uuid
+import logging, platform, shutil, subprocess, re
 from pathlib import Path
 
-import streamlit as st
-from PIL import Image
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.schema import HumanMessage, SystemMessage
 
-# ── Global logging (everything DEBUG to Streamlit logs) ───────────────
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s | %(message)s")
+from config import MODEL_NAME
+from prompt import main_prompt, generic_prompt
+from scad import SCADGuard
+
 log = logging.getLogger(__name__)
 
-# ── Secrets & environment ─────────────────────────────────────────────
-os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+def text_to_scad(request: str, retries: int = 5, base_temperature: float = 0.2) -> str:
+    guard = SCADGuard()
+    convo = [
+        SystemMessage(content=main_prompt()),
+        HumanMessage(content=generic_prompt(request)),
+    ]
+    last_err = ""
 
-from txt_to_code import text_to_scad, save_scad_code, render_scad  # noqa: E402
+    for attempt in range(1, retries + 1):
+        temp = min(base_temperature + 0.1 * (attempt - 1), 1.0)
+        log.debug("🔄 attempt %d/%d (temp=%.2f)", attempt, retries, temp)
 
-# Auto-detect OpenSCAD; env var wins, then PATH, then Windows fallback
-OPENSCAD_EXE = (
-    os.getenv("OPENSCAD_PATH")
-    or shutil.which("openscad")
-    or r"C:\Program Files\OpenSCAD\openscad.exe"
-)
+        llm = ChatGoogleGenerativeAI(model=MODEL_NAME, temperature=temp)
+        code = str(llm.invoke(convo).content).strip()
+        code = code.removeprefix("```").removesuffix("```").lstrip()
 
-log.debug("🔍 OPENSCAD_EXE = %s", OPENSCAD_EXE)
+        if code.startswith("BLOCKED"):
+            continue
 
-# ── UI layout ─────────────────────────────────────────────────────────
-st.title("🖼️  Text → CAD (Phase 0)")
+        ok, msg = guard.clean(code)
+        if not ok:
+            convo.append(HumanMessage(content=f"RULE-VIOLATION: {msg}\nRegenerate."))
+            continue
 
-prompt = st.text_area(
-    "Describe your CAD part",
-    placeholder="e.g. Create a spur gear with 60 teeth, module 2 mm, thickness 8 mm",
-    height=140,
-)
+        ok, err = guard.compile_ok(code)
+        if ok:
+            return code
 
-if st.button("Generate"):
-    if not prompt.strip():
-        st.error("Please enter a description first.")
-        st.stop()
+        last_err = err
+        convo.append(HumanMessage(content=f"COMPILER-ERROR: {err}\nFix & resend."))
 
-    # 1 ─ Generate SCAD -------------------------------------------------
-    try:
-        scad_code = text_to_scad(prompt)
-    except Exception as e:
-        st.error(f"LLM generation failed:\n{e}")
-        log.exception("LLM generation failed")
-        st.stop()
+    raise RuntimeError(
+        "Failed to obtain valid OpenSCAD after "
+        f"{retries} attempts.\n----- last compiler error -----\n{last_err}"
+    )
 
-    # 2 ─ Save .scad ----------------------------------------------------
-    tmp_dir = Path(tempfile.gettempdir()) / f"cad_{uuid.uuid4().hex[:8]}"
-    tmp_dir.mkdir(exist_ok=True)
-    scad_path = save_scad_code(scad_code, tmp_dir / "model")
-    log.debug("💾 SCAD saved to %s", scad_path)
+# helpers --------------------------------------------------------------
+def save_scad_code(code: str, outfile: Path | str) -> Path:
+    p = Path(outfile).with_suffix(".scad")
+    p.write_text(code, encoding="utf-8")
+    return p
 
-    # 3 ─ Render → PNG --------------------------------------------------
-    try:
-        png_path = render_scad(scad_path, openscad_path=OPENSCAD_EXE)
-    except FileNotFoundError:
-        st.error("OpenSCAD CLI not found. Check OPENSCAD_EXE in ui.py.")
-        log.exception("OpenSCAD binary not found")
-        st.stop()
-    except Exception as e:
-        st.error(f"Render failed:\n{e}")
-        log.exception("Render failed")
-        st.stop()
+def render_scad(
+    scad_path: Path,
+    img_size: tuple[int, int] = (800, 600),
+    openscad_path: str | None = None,
+) -> Path:
+    png = scad_path.with_suffix(".png")
+    openscad_path = (
+        openscad_path
+        or shutil.which("openscad")
+        or "openscad"
+    )
 
-    # 4 ─ Display & download -------------------------------------------
-    st.subheader("OpenSCAD source")
-    st.code(scad_code, language="scad")
-    st.subheader("Preview")
-    st.image(Image.open(png_path), use_container_width=True)
+    xvfb = shutil.which("xvfb-run") if platform.system() != "Windows" else None
+    cmd = [
+        openscad_path, "-o", str(png),
+        "--imgsize", f"{img_size[0]},{img_size[1]}",
+        str(scad_path),
+    ]
+    if xvfb:
+        cmd = [xvfb, "--auto-servernum", "--server-args=-screen 0 1280x1024x24", *cmd]
 
-    st.download_button("Download .scad", scad_path.read_bytes(), file_name="model.scad")
-    st.download_button("Download .png", png_path.read_bytes(), file_name="preview.png")
-
+    subprocess.run(cmd, check=True)
+    return png

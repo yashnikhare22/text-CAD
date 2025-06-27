@@ -1,34 +1,18 @@
-# txt_to_code.py ────────────────────────────────────────────────────────
-"""
-Gemini → OpenSCAD helpers with detailed logging.
-
-• Logs every retry, temperature and compile error.
-• render_scad() is xvfb-aware and verbose.
-"""
-
+# txt_to_code.py — Gemini ⇨ OpenSCAD
 from __future__ import annotations
-
-import logging
-import platform
-import shutil
-import subprocess
+import logging, platform, shutil, subprocess, re
 from pathlib import Path
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage
 
-from config import MODEL_NAME  # GOOGLE_API_VERSION kept for future upgrades
+from config import MODEL_NAME
 from prompt import main_prompt, generic_prompt
 from scad import SCADGuard
 
 log = logging.getLogger(__name__)
 
-# ───────────────────────────────────────────────────────────────────────
-def text_to_scad(
-    request: str,
-    retries: int = 5,
-    base_temperature: float = 0.0,
-) -> str:
+def text_to_scad(request: str, retries: int = 5, base_temperature: float = 0.2) -> str:
     guard = SCADGuard()
     convo = [
         SystemMessage(content=main_prompt()),
@@ -45,22 +29,18 @@ def text_to_scad(
         code = code.removeprefix("```").removesuffix("```").lstrip()
 
         if code.startswith("BLOCKED"):
-            log.debug("⚠️  got BLOCKED token from model – retrying")
             continue
 
         ok, msg = guard.clean(code)
         if not ok:
-            log.debug("⛔ hygiene violation: %s", msg)
             convo.append(HumanMessage(content=f"RULE-VIOLATION: {msg}\nRegenerate."))
             continue
 
         ok, err = guard.compile_ok(code)
         if ok:
-            log.debug("✅ compile check passed")
             return code
 
         last_err = err
-        log.debug("⛔ compiler error:\n%s", err)
         convo.append(HumanMessage(content=f"COMPILER-ERROR: {err}\nFix & resend."))
 
     raise RuntimeError(
@@ -68,13 +48,11 @@ def text_to_scad(
         f"{retries} attempts.\n----- last compiler error -----\n{last_err}"
     )
 
-
-# ── helpers ───────────────────────────────────────────────────────────
+# helpers --------------------------------------------------------------
 def save_scad_code(code: str, outfile: Path | str) -> Path:
     p = Path(outfile).with_suffix(".scad")
     p.write_text(code, encoding="utf-8")
     return p
-
 
 def render_scad(
     scad_path: Path,
@@ -85,27 +63,17 @@ def render_scad(
     openscad_path = (
         openscad_path
         or shutil.which("openscad")
-        or "openscad"  # last-ditch – will error if truly missing
+        or "openscad"
     )
 
     xvfb = shutil.which("xvfb-run") if platform.system() != "Windows" else None
     cmd = [
-        openscad_path,
-        "-o",
-        str(png),
-        "--imgsize",
-        f"{img_size[0]},{img_size[1]}",
+        openscad_path, "-o", str(png),
+        "--imgsize", f"{img_size[0]},{img_size[1]}",
         str(scad_path),
     ]
     if xvfb:
-        cmd = [
-            xvfb,
-            "--auto-servernum",
-            "--server-args=-screen 0 1280x1024x24",
-            *cmd,
-        ]
+        cmd = [xvfb, "--auto-servernum", "--server-args=-screen 0 1280x1024x24", *cmd]
 
-    log.debug("🎞️  render_scad running: %s", " ".join(cmd))
     subprocess.run(cmd, check=True)
-    log.debug("🎞️  PNG written → %s", png)
     return png
