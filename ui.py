@@ -20,7 +20,7 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("🛠️  Natural-language → OpenSCAD CAD generator")
+st.title(" Text →  CAD phase 0")
 
 # ── Prompt box ─────────────────────────────────────────────────────
 request = st.text_area(
@@ -43,7 +43,6 @@ if generate:
     st.subheader("Generated OpenSCAD")
     st.code(scad_code, language="openscad")
 
-    # ── Render preview image ───────────────────────────────────────
     with tempfile.TemporaryDirectory() as tmp_dir:
         scad_path = Path(tmp_dir) / "model.scad"
         save_scad_code(scad_code, scad_path)
@@ -54,8 +53,4 @@ if generate:
         except Exception as err:
             st.warning(f"Could not render preview:\n\n{err}")
 
-# ── Footer ─────────────────────────────────────────────────────────
-st.markdown("---")
-st.caption(
-    "Powered by Google Gemini 1.5-flash · LangChain · OpenSCAD 2021.01 · Streamlit"
-)
+
